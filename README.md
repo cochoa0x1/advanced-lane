@@ -203,4 +203,3 @@ Here's a [link to my video result](./project_video_result.mp4)
 ### Discussion
 
 The pipeline suffers from some major problems. While it attempts to track the lane lines position it currently does not do a good job of preventing wild swings in curvature etc. Additionally it is very slow. As coded producing the project_video takes about 6 minutes on a quadcore i7. Some simple heuristics might improve tolerance to false detections etc. The pipeline is also likely to fail on roads of differnet grade or S shaped curves where a higher order polynominal is needed. The reliance on color for detection is also unfortunetly critical. I doubt it would work at night or with a white or yellow car in the area of the perspective transform.
-
