@@ -2,8 +2,8 @@
 
 ### 1. Camera Calibration
 
-The camera was calibrates by finding chessboard corners using `cv2.findChessboardCorners` and mapping those corners onto a calculated grid.
-Those points were then fed to `cv2.calibrateCamera` to calculate the camera coefficients which were then saved to a file camera.json. The code for this is found in calibrate.ipynb
+The camera was calibrated by finding chessboard corners using `cv2.findChessboardCorners` and mapping those corners onto a calculated grid.
+Those camera points and grid points were then fed to `cv2.calibrateCamera` to calculate the camera coefficients. Results were then saved to a file camera.json. The code for this is found in calibrate.ipynb
 
 To undistort an image, the camera json file is loaded and used with `cv2.undistort`. A sample output from calibration is below:
 
@@ -13,7 +13,7 @@ To undistort an image, the camera json file is loaded and used with `cv2.undisto
 
 ### 3. Perspective Transform
 
-I manually observed the x,y pixel coordinates of the lanes in straight lane image and calculated a perspective transform to map those points to a rectangle. Doing so transforms that section of road to one that appears as if being viewed from above. I calculate only the transformation matrix and inverse tranformation and store them in the LaneLineFinder class.
+I manually observed the x,y pixel coordinates of the lane in a straight lane image and calculated a perspective transform to map those points to a rectangle. Doing so transforms that section of road to one that appears as if being viewed from above. I calculated both the transformation matrix and inverse transformation and stored them in the LaneLineFinder class M and M_inv properties.
 
 <table border="1" class="dataframe">
   <thead>
@@ -71,7 +71,7 @@ def calc_warp_matrix(self):
 
 ### 3. Lane line masking
 
-To identify lane lines a combination of color thresholds and directional gradients were used. Building on the method used in the first lane line project, white and yellow lines were identified indiviually by a color threshold.
+To identify lane lines a combination of color thresholds and directional gradients were used. Building on the method used in the first lane line project, white and yellow lines were identified individually by a color threshold.
 
 ```python
 #yellow mask
@@ -85,7 +85,7 @@ upper= np.array([255,255,255])
 white = cv2.inRange(img, lowery, upper)
 ```
 
-Additionally, by converting to an HLS colorspace, it was observed that yellow lines were mostly found at high S and low H values while white lines were found at high H values. So masks for those channels were created and ORed with the project 1 lines.
+Additionally, by converting to an HLS colorspace, it was observed that yellow lines were mostly found at high S and low H values while white lines were found at high H values. So masks for those channels were created and OR-ed with the project 1 lines.
 
 ```python
 a=apply_mask(S,(120,255))
@@ -98,7 +98,7 @@ white_line = np.logical_or(b ,white)
 
 return np.logical_or(yellow_line, white_line)
 ```
-Color alone was not reliable enough to always find the lanes, so a mix of x gradients and gradient angle thresholds were used also. The final code is in the lane_line_mask function.
+Color alone was not reliable enough to always find the lanes, so a mix of x gradients and gradient angle thresholds, as calculated via a sobel filter, were used also. The final code is in the lane_line_mask function.
 
 ![alt text](./output_images/test2_masking.png "masking")
 
@@ -112,8 +112,8 @@ The goal here was to fit the lane lines to a quadratic function of y. To do this
 ##### 1. Split the warped and masked image into left and right images
 This was fairly simple and naive, left lanes live on the left half side of the image and right live on the right half.
 
-##### 2. Filter out unwanted points left over from overly aggresive thresholding
-To cleanup the images I used simple bayseian filter that walked upwards from the bottom and constructed a per row probability distribution of where the lane lines might be.
+##### 2. Filter out unwanted points left over from overly aggressive thresholds.
+To cleanup the images I used simple Bayesian filter that walked upwards from the bottom and constructed a per row probability distribution of where the lane lines might be in that given row.
 This distribution was then used to filter out points from the source image by considering only points falling within the interquartile range and/or a fixed width window around the per row mean.
 
 ```python
@@ -147,7 +147,7 @@ def simple_bayes_filter(img,p_move,prior=None):
 ```
 
 ##### 3. Calculate an appropriate loss function and pass the data to an optimizer
-The model for the lines is quadratic ie Ay*2+B*y+C, and because the lines should be parallel at all y values they should have the same parameters and differ only by a translation. A fourth Paramter D was used to set the lane width and a loss function was defined as the MSE of each line summed together. This was passed to `scipy.optimize.minimize` using the L-BFGS-B solver to include optional bounds on the lane width etc.
+The model for the lines is quadratic ie Ay*2+B*y+C, and because the lines should be parallel at all y values they should have the same parameters and differ only by a translation. A fourth parameter D was used to set the lane width and a loss function was defined as the MSE of each line summed together. This was passed to `scipy.optimize.minimize` using the L-BFGS-B solver to include optional bounds on the lane width etc.
 
 ```python
 def f(p):
@@ -166,7 +166,7 @@ def f(p):
 
 ### 5. Curvature and position
 
-Lane line curvature and vehicle position from center was calculated with the formulas below. `r` is the fit parameter vector with `r[2]` being the x position of the left lane line and `r[3]` being the width of the lane.
+Lane line curvature and vehicle position from center were calculated with the formulas below. `r` is the fit parameter vector with `r[2]` being the x position of the left lane line and `r[3]` being the width of the lane.
 
 ```python
 def lane_line_curve(self,r,y_eval=0):
@@ -202,4 +202,4 @@ Here's a [link to my video result](./project_video_result.mp4)
 
 ### Discussion
 
-The pipeline suffers from some major problems. While it attempts to track the lane lines position it currently does not do a good job of preventing wild swings in curvature etc. Additionally it is very slow. As coded producing the project_video takes about 6 minutes on a quadcore i7. Some simple heuristics might improve tolerance to false detections etc. The pipeline is also likely to fail on roads of differnet grade or S shaped curves where a higher order polynominal is needed. The reliance on color for detection is also unfortunetly critical. I doubt it would work at night or with a white or yellow car in the area of the perspective transform.
+The pipeline suffers from some major problems. While it attempts to track the lane lines position it currently does not do a good job of preventing wild swings in curvature etc. Additionally it is very slow. As coded, producing the project video takes about 6 minutes on a quadcore i7. Some simple heuristics might improve tolerance to false detection etc and a better implementation of the lane line cleanup prior to fitting would help with speed. The pipeline is also likely to fail on roads of different grade where is not true that the lane lines should be parallel after a transform. Also S shaped curves where a higher order polynomial is needed will currently fail in the same way as curved roads failed in the first project where lanes were assumed to be straight. The reliance on color for detection is also unfortunately critical. I doubt it would work at night or with a white or yellow car in the area of the perspective transform.
